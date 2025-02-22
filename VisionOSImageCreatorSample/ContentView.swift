@@ -15,6 +15,8 @@ struct ContentView: View {
     @State private var isLoading = false
     @State private var inputText: String = "A cat wearing mittens"
     @State private var generatedText: String = ""
+    @State private var imageLimit: Int = 1
+    let limitOptions = Array(1...4)
     
     var body: some View {
         VStack {
@@ -39,9 +41,20 @@ struct ContentView: View {
                 }
             }
             
-            TextField("Enter description (e.g. A cat wearing mittens)", text: $inputText)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
+            HStack {
+                TextField("Enter description (e.g. A cat wearing mittens)", text: $inputText)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .frame(width: 400)
+                    .padding()
+                
+                Picker("Image Limit", selection: $imageLimit) {
+                    ForEach(limitOptions, id: \..self) { limit in
+                        Text("\(limit)").tag(limit)
+                    }
+                }
+                .pickerStyle(MenuPickerStyle())
                 .padding()
+            }
             
             Button(action: {
                 Task {
@@ -60,7 +73,7 @@ struct ContentView: View {
         .padding()
     }
     
-    @MainActor
+    //@MainActor
     func generateImage() async {
         isLoading = true
         generatedImages.removeAll()
@@ -73,15 +86,12 @@ struct ContentView: View {
             let images = creator.images(
                 for: [.text(inputText)],
                     style: style,
-                    limit: 4)
-            
+                    limit: imageLimit)
             generatedText = inputText
-            
             for try await image in images {
                 let uiImage = UIImage(cgImage: image.cgImage)
                 generatedImages.append(Image(uiImage: uiImage))
             }
-            
         } catch {
             generatedText = "Failed to generate image: \(error) : \(inputText)"
         }
