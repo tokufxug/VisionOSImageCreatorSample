@@ -73,7 +73,7 @@ struct ContentView: View {
         .padding()
     }
     
-    //@MainActor
+    @MainActor
     func generateImage() async {
         isLoading = true
         generatedImages.removeAll()
