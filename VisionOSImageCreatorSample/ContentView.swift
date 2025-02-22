@@ -108,9 +108,9 @@ struct ContentView: View {
         do {
             guard let creator = creator else { return }
             guard let style = creator.availableStyles.first(where: { $0.id == selectedStyleId }) else {
-                    generatedText = "Style not found"
-                    isLoading = false
-                    return
+                generatedText = "Style not found"
+                isLoading = false
+                return
             }
             let images = creator.images(
                 for: [.text(inputText)],
