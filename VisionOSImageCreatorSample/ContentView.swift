@@ -11,11 +11,13 @@ import ImagePlayground
 struct ContentView: View {
     
     @Environment(\.supportsImagePlayground) private var supportsImagePlayground
+    @State private var creator: ImageCreator?
     @State private var generatedImages: [Image] = []
     @State private var isLoading = false
     @State private var inputText: String = "A cat wearing mittens"
     @State private var generatedText: String = ""
     @State private var imageLimit: Int = 1
+    @State private var selectedStyleId: String = ""
     let limitOptions = Array(1...4)
     
     var body: some View {
@@ -41,19 +43,31 @@ struct ContentView: View {
                 }
             }
             
-            HStack {
+            HStack(spacing: 16) {
                 TextField("Enter description (e.g. A cat wearing mittens)", text: $inputText)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .frame(width: 400)
-                    .padding()
-                
                 Picker("Image Limit", selection: $imageLimit) {
                     ForEach(limitOptions, id: \..self) { limit in
                         Text("\(limit)").tag(limit)
                     }
                 }
                 .pickerStyle(MenuPickerStyle())
-                .padding()
+                if let creator = creator, !creator.availableStyles.isEmpty {
+                    Picker("Select Style", selection: $selectedStyleId) {
+                        ForEach(creator.availableStyles, id: \.self) { style in
+                            Text(style.id).tag(style.id)
+                        }
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                }
+                Button("Clear") {
+                    if let firstStyle = creator?.availableStyles.first {
+                        selectedStyleId = firstStyle.id
+                    }
+                    inputText = ""
+                    imageLimit = 1
+                }
             }
             
             Button(action: {
@@ -70,33 +84,47 @@ struct ContentView: View {
                 Text(generatedText)
             }
         }
+        .onAppear {
+            if ImagePlaygroundViewController.isAvailable && supportsImagePlayground {
+                Task {
+                    do {
+                        creator = try await ImageCreator()
+                        if let firstStyle = creator?.availableStyles.first {
+                            selectedStyleId = firstStyle.id
+                        }
+                    } catch {
+                        // Handle error if needed
+                    }
+                }
+            }
+        }
         .padding()
     }
     
     @MainActor
     func generateImage() async {
         isLoading = true
-        generatedImages.removeAll()
         generatedText = ""
-        
         do {
-            let creator = try await ImageCreator()
-            guard let style = creator.availableStyles.first else { return }
-            
+            guard let creator = creator else { return }
+            guard let style = creator.availableStyles.first(where: { $0.id == selectedStyleId }) else {
+                    generatedText = "Style not found"
+                    isLoading = false
+                    return
+            }
             let images = creator.images(
                 for: [.text(inputText)],
                     style: style,
                     limit: imageLimit)
-            generatedText = inputText
+            generatedText = "\(selectedStyleId) : \(inputText)"
             for try await image in images {
                 let uiImage = UIImage(cgImage: image.cgImage)
-                generatedImages.append(Image(uiImage: uiImage))
+                generatedImages.insert(Image(uiImage: uiImage), at: 0)
             }
         } catch {
-            generatedText = "Failed to generate image: \(error) : \(inputText)"
+            generatedText = "Failed to generate image: \(error) : \(selectedStyleId) : \(inputText)"
         }
         isLoading = false
-        inputText = ""
     }
 }
 
